@@ -4,8 +4,6 @@ env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
   PATH: $ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-  # Tắt cảnh báo Node 20 nếu cần, hoặc để tự động dùng Node 24
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: false
 
 on:
   workflow_dispatch:
@@ -15,12 +13,6 @@ jobs:
     name: Build APK Thủ Công
     runs-on: ubuntu-latest
     steps:
-      # ✅ Cài các công cụ hệ thống cơ bản (tar, unzip...)
-      - name: Cài gói hệ thống cần thiết
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y tar unzip wget git
-
       - name: Lấy mã nguồn
         uses: actions/checkout@v4
 
@@ -38,7 +30,7 @@ jobs:
           cd $ANDROID_HOME/cmdline-tools
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076798_latest.zip -O cmdline.zip
           unzip -q cmdline.zip
-          mv cmdline-tools latest || true
+          mv cmdline-tools latest 2>/dev/null || true
           rm cmdline.zip
           yes | sdkmanager "platforms;android-37" "build-tools;37.0.0" "platform-tools"
           sdkmanager --licenses || true
@@ -46,13 +38,13 @@ jobs:
       - name: Thực thi build
         run: ./gradlew clean assembleDebug --no-daemon --stacktrace
 
-      - name: Đổi tên & chuẩn bị APK
+      - name: Đổi tên APK
         if: success()
         run: |
           APK=$(find app/build/outputs/apk/debug -name "*.apk" -type f | head -1)
           mv "$APK" Bitcoin-Paper-Wallet-offline.apk
 
-      - name: Lưu APK làm sản phẩm
+      - name: Lưu APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
