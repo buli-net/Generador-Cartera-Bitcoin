@@ -13,11 +13,17 @@ jobs:
     name: Build APK Thủ Công
     runs-on: ubuntu-latest
     steps:
-      - name: Lấy mã nguồn — dùng GIT, không cần tar
+      # ✅ Cài tar/unzip cho người dùng hiện tại, không cần sudo
+      - name: Cài công cụ giải nén
+        run: |
+          cd ~
+          wget -q http://archive.ubuntu.com/ubuntu/pool/main/t/tar/tar_1.34+dfsg-3_amd64.deb -O tar.deb
+          dpkg -x tar.deb ~/tar
+          echo "$HOME/tar/usr/bin" >> $GITHUB_PATH
+          rm tar.deb
+
+      - name: Lấy mã nguồn
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          archive: false
 
       - name: Cài JDK 11
         uses: actions/setup-java@v4
