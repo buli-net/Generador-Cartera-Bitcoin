@@ -1,0 +1,48 @@
+name: Build Bitcoin Paper Wallet
+
+env:
+  ANDROID_HOME: /usr/local/lib/android/sdk
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+# 🔴 CHỈ CHO CHẠY THỦ CÔNG — KHÔNG TỰ ĐỘNG KÍCH HOẠT
+on:
+  workflow_dispatch:  # Chỉ hiện nút "Run workflow" trên trang Actions
+
+jobs:
+  build:
+    name: Build APK Thủ Công
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài JDK 11
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'zulu'
+          cache: 'gradle'
+
+      - name: Cài Android SDK khớp dự án
+        run: |
+          chmod +x gradlew
+          yes | sdkmanager "platforms;android-37" "build-tools;37.0.0" "platform-tools"
+          sdkmanager --licenses
+
+      - name: Thực thi build
+        run: ./gradlew clean assembleDebug --no-daemon --stacktrace
+
+      - name: Đổi tên & chuẩn bị APK
+        if: success()
+        run: |
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" -type f | head -1)
+          mv "$APK" Bitcoin-Paper-Wallet-offline.apk
+          echo "APK_PATH=Bitcoin-Paper-Wallet-offline.apk" >> $GITHUB_OUTPUT
+
+      - name: Lưu APK làm sản phẩm
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Bitcoin-Paper-Wallet-APK
+          path: Bitcoin-Paper-Wallet-offline.apk
+          retention-days: 30
