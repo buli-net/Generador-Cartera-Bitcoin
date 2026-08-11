@@ -4,7 +4,7 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   SKIP_JDK_VERSION_CHECK: "true"
 
-# 🔴 CHỈ CHẠY KHI BẠN BẤM NÚT — KHÔNG TỰ ĐỘNG KHI PUSH/PR
+# 🔴 CHỈ CHẠY KHI BẠN BẤM NÚT — KHÔNG TỰ ĐỘNG
 on:
   workflow_dispatch:
 
@@ -16,54 +16,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Java 11
+      # ✅ SỬA LỖI CHÍNH: ĐỔI TỪ JAVA 11 → JAVA 17
+      # Gradle 9.x YÊU CẦU TỐI THIỂU Java 17
+      - name: Setup Java 17 (bắt buộc cho Gradle 9.x)
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'zulu'
 
       - name: Xóa cache Gradle cũ (tránh xung đột)
         run: rm -rf ~/.gradle/caches
 
-      # ✅ DÙNG ANDROID-34 (ANDROID 14) — ỔN ĐỊNH, CHẮC CHẮN TỒN TẠI
-      # ❌ android-37 = Android 17 Preview ĐÃ BỊ GỠ KHỎI REPO CHÍNH
-      - name: Setup Android SDK khớp dự án
+      # ✅ Dùng android-34 (ổn định) + build-tools 34.0.0
+      # ❌ android-37 = Preview đã bị Google xóa khỏi repo
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           cmdline-tools-version: 8092744
           accept-android-sdk-licenses: true
           packages: "platform-tools build-tools;34.0.0 platforms;android-34"
 
-      # ✅ CHỈ GIỮ LẠI BUILD-TOOLS 34.0.0 DUY NHẤT → KHÔNG CÒN LỖI "Not a number"
+      # ✅ CHỈ GIỮ build-tools 34.0.0 DUY NHẤT
+      # Tránh lỗi "Not a number: 37.0.0" khi có nhiều version
       - name: Giữ lại build-tools 34.0.0 duy nhất
         run: |
           cd $ANDROID_HOME/build-tools
           for dir in *; do
             [ "$dir" = "34.0.0" ] || rm -rf "$dir"
           done
+          echo "✅ Build-tools còn lại:"
           ls -la
 
       - name: Cấp quyền thực thi gradlew
         run: chmod +x gradlew
 
-      # ✅ BUILD APK
+      # ✅ BUILD APK — BỎ --no-daemon (tránh tạo process thừa)
       - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --stacktrace --no-daemon
+        run: ./gradlew clean assembleDebug --stacktrace
 
-      # ✅ ĐỔI TÊN VÀ KIỂM TRA FILE KẾT QUẢ
       - name: Đổi tên APK dễ nhận biết
         run: |
           APK=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | head -1)
           if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-            echo "❌ LỖI: Không tìm thấy APK sau khi build"
+            echo "❌ LỖI: Không tìm thấy APK"
             find . -name "*.apk" 2>/dev/null || true
             exit 1
           fi
           mv "$APK" Bitcoin-Paper-Wallet-offline.apk
-          echo "✅ APK đã tạo thành công:"
           ls -lh Bitcoin-Paper-Wallet-offline.apk
 
-      # ✅ TẢI LÊN ĐỂ BẠN TẢI VỀ
       - uses: actions/upload-artifact@v4
         with:
           name: Bitcoin-Paper-Wallet-APK
