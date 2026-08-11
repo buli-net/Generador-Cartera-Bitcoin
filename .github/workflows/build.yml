@@ -15,18 +15,44 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ✅ BƯỚC 1: Tải & giải nén mã nguồn — KHÔNG CẦN TAR, KHÔNG DÙNG CHECKOUT
+      # ✅ BƯỚC 1: Tải & giải nén mã nguồn — DÙNG NODE + PYTHON CÓ SẴN
       - name: Tải mã nguồn từ GitHub
         run: |
           REPO="${{ github.repository }}"
           BRANCH="${{ github.ref_name }}"
-          curl -sL "https://github.com/${REPO}/archive/refs/heads/${BRANCH}.zip" -o source.zip
-          unzip -q source.zip
-          # Di chuyển toàn bộ nội dung ra thư mục gốc
-          FOLDER=$(unzip -l source.zip | head -5 | tail -1 | awk '{print $NF}')
-          mv "${FOLDER}"/* .
-          mv "${FOLDER}"/.git* . 2>/dev/null || true
-          rm -rf "${FOLDER}" source.zip
+          URL="https://github.com/${REPO}/archive/refs/heads/${BRANCH}.zip"
+          echo "Tải từ: $URL"
+          # Tải bằng Node.js (luôn có trên Actions)
+          node -e "
+            const https = require('https');
+            const fs = require('fs');
+            https.get('${URL}', { headers: { 'User-Agent': 'GitHub-Actions' } }, res => {
+              if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                https.get(res.headers.location, r => r.pipe(fs.createWriteStream('source.zip')));
+              } else {
+                res.pipe(fs.createWriteStream('source.zip'));
+              }
+            }).on('error', e => { console.error(e); process.exit(1); });
+          "
+          # Giải nén & di chuyển bằng Python 3 (luôn có)
+          python3 -c "
+            import zipfile, os, shutil
+            with zipfile.ZipFile('source.zip') as z:
+                z.extractall('.')
+            # Tìm thư mục gốc sau giải nén
+            root = None
+            for d in os.listdir('.'):
+                if os.path.isdir(d) and d.startswith('Generador-Cartera-Bitcoin-'):
+                    root = d; break
+            if not root:
+                raise SystemExit('Không tìm thấy thư mục giải nén')
+            for f in os.listdir(root):
+                shutil.move(os.path.join(root, f), f'.')
+            shutil.rmtree(root)
+            os.remove('source.zip')
+            print('✅ Đã giải nén xong')
+          "
+          ls -la
 
       # ✅ BƯỚC 2: Cài JDK 11 — khớp build.gradle
       - name: Cài JDK 11
@@ -36,34 +62,58 @@ jobs:
           distribution: 'zulu'
           cache: 'gradle'
 
-      # ✅ BƯỚC 3: Cài Android SDK — khớp compileSdk 37
-      - name: Cài Android Command Line Tools & SDK
+      # ✅ BƯỚC 3: Cài Android SDK — cũng dùng Node + Python
+      - name: Cài Android Command Line Tools & SDK 37
         run: |
           chmod +x gradlew
           mkdir -p "$ANDROID_HOME/cmdline-tools"
           cd "$ANDROID_HOME/cmdline-tools"
-          curl -sL "https://dl.google.com/android/repository/commandlinetools-linux-11076798_latest.zip" -o cmdline.zip
-          unzip -q cmdline.zip
-          mv cmdline-tools latest 2>/dev/null || true
-          rm -f cmdline.zip
+          # Tải bằng Node
+          node -e "
+            const https = require('https');
+            const fs = require('fs');
+            const URL = 'https://dl.google.com/android/repository/commandlinetools-linux-11076798_latest.zip';
+            https.get(URL, res => {
+              if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                https.get(res.headers.location, r => r.pipe(fs.createWriteStream('cmdline.zip')));
+              } else {
+                res.pipe(fs.createWriteStream('cmdline.zip'));
+              }
+            }).on('error', e => { console.error(e); process.exit(1); });
+          "
+          # Giải nén bằng Python
+          python3 -c "
+            import zipfile, os, shutil
+            with zipfile.ZipFile('cmdline.zip') as z:
+                z.extractall('.')
+            if os.path.isdir('latest'):
+                shutil.rmtree('latest')
+            os.rename('cmdline-tools', 'latest')
+            os.remove('cmdline.zip')
+            print('✅ Đã giải nén cmdline-tools')
+          "
+          cd "$GITHUB_WORKSPACE"
           # Cài SDK đúng phiên bản dự án
-          yes | sdkmanager "platforms;android-37" "build-tools;37.0.0" "platform-tools" >/dev/null
+          yes 2>/dev/null | sdkmanager "platforms;android-37" "build-tools;37.0.0" "platform-tools" >/dev/null 2>&1 || true
           sdkmanager --licenses >/dev/null 2>&1 || true
+          echo "✅ SDK đã sẵn sàng"
 
       # ✅ BƯỚC 4: Build APK
       - name: Build Debug APK
         run: ./gradlew clean assembleDebug --no-daemon --stacktrace
 
-      # ✅ BƯỚC 5: Chuẩn bị file kết quả
-      - name: Đổi tên APK dễ nhận biết
+      # ✅ BƯỚC 5: Kiểm tra & đổi tên APK
+      - name: Chuẩn bị file kết quả
         if: success()
         run: |
           APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" -type f | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "❌ Không tìm thấy APK sau build"
+          if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
+            echo "❌ LỖI: Không tìm thấy APK sau build"
+            ls -la app/build/outputs/apk/debug/ 2>/dev/null || true
             exit 1
           fi
           cp "$APK_PATH" "Bitcoin-Paper-Wallet-offline.apk"
+          echo "✅ APK đã tạo:"
           ls -la "Bitcoin-Paper-Wallet-offline.apk"
 
       # ✅ BƯỚC 6: Lưu APK ra sản phẩm tải về
