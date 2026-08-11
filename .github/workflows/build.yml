@@ -5,7 +5,7 @@ env:
   SKIP_JDK_VERSION_CHECK: "true"
 
 on:
-  workflow_dispatch:  # 🔴 CHỈ CHẠY THỦ CÔNG — KHÔNG TỰ ĐỘNG KHI PUSH/PR
+  workflow_dispatch:  # 🔴 CHỈ CHẠY THỦ CÔNG — KHÔNG TỰ ĐỘNG
 
 jobs:
   build:
@@ -23,10 +23,11 @@ jobs:
       - name: Xóa cache cũ
         run: rm -rf ~/.gradle/caches
 
+      # ✅ Dùng phiên bản cmdline-tools ổn định, CÒN TỒN TẠI trên Google
       - name: Setup Android SDK khớp dự án
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: 11076798
+          cmdline-tools-version: 8092744  # ✅ Phiên bản chuẩn, không bị 404
           accept-android-sdk-licenses: true
           packages: "platform-tools build-tools;37.0.0 platforms;android-37"
 
