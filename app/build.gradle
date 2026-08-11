@@ -1,72 +1,50 @@
-name: Build Bitcoin Paper Wallet
+plugins {
+    alias(libs.plugins.android.application)
+}
 
-env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-  SKIP_JDK_VERSION_CHECK: "true"
+android {
+    namespace 'com.diamon.ganar'
+    compileSdk {
+       version = release(37)
+    }
 
-# 🔴 CHỈ CHẠY KHI BẠN BẤM NÚT — KHÔNG TỰ ĐỘNG
-on:
-  workflow_dispatch:
+    defaultConfig {
+        applicationId "com.diamon.ganar"
+        minSdk 23
+        targetSdk 34
+        versionCode 30
+        versionName "2.0.3"
 
-jobs:
-  build:
-    name: Build APK
-    runs-on: ubuntu-latest
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
 
-    steps:
-      - uses: actions/checkout@v4
+    buildFeatures {
+        viewBinding true
+    }
 
-      # ✅ SỬA LỖI CHÍNH: ĐỔI TỪ JAVA 11 → JAVA 17
-      # Gradle 9.x YÊU CẦU TỐI THIỂU Java 17
-      - name: Setup Java 17 (bắt buộc cho Gradle 9.x)
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'zulu'
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
 
-      - name: Xóa cache Gradle cũ (tránh xung đột)
-        run: rm -rf ~/.gradle/caches
-
-      # ✅ Dùng android-34 (ổn định) + build-tools 34.0.0
-      # ❌ android-37 = Preview đã bị Google xóa khỏi repo
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 8092744
-          accept-android-sdk-licenses: true
-          packages: "platform-tools build-tools;34.0.0 platforms;android-34"
-
-      # ✅ CHỈ GIỮ build-tools 34.0.0 DUY NHẤT
-      # Tránh lỗi "Not a number: 37.0.0" khi có nhiều version
-      - name: Giữ lại build-tools 34.0.0 duy nhất
-        run: |
-          cd $ANDROID_HOME/build-tools
-          for dir in *; do
-            [ "$dir" = "34.0.0" ] || rm -rf "$dir"
-          done
-          echo "✅ Build-tools còn lại:"
-          ls -la
-
-      - name: Cấp quyền thực thi gradlew
-        run: chmod +x gradlew
-
-      # ✅ BUILD APK — BỎ --no-daemon (tránh tạo process thừa)
-      - name: Build Debug APK
-        run: ./gradlew clean assembleDebug --stacktrace
-
-      - name: Đổi tên APK dễ nhận biết
-        run: |
-          APK=$(find . -path "*/build/outputs/apk/debug/*.apk" -type f | head -1)
-          if [ -z "$APK" ] || [ ! -f "$APK" ]; then
-            echo "❌ LỖI: Không tìm thấy APK"
-            find . -name "*.apk" 2>/dev/null || true
-            exit 1
-          fi
-          mv "$APK" Bitcoin-Paper-Wallet-offline.apk
-          ls -lh Bitcoin-Paper-Wallet-offline.apk
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Bitcoin-Paper-Wallet-APK
-          path: Bitcoin-Paper-Wallet-offline.apk
-          retention-days: 30
+dependencies {
+    implementation libs.appcompat
+    implementation libs.material
+    implementation libs.activity
+    implementation libs.constraintlayout
+    testImplementation libs.junit
+    androidTestImplementation libs.ext.junit
+    androidTestImplementation libs.espresso.core
+    // ViewModel y LiveData
+    implementation libs.lifecycle.viewmodel
+    implementation libs.lifecycle.livedata
+    // Bouncy Castle para Criptografia avanzada (RIPEMD160, SECP256k1)
+    implementation libs.bcprov.jdk15to18
+}
