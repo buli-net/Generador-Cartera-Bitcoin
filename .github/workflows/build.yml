@@ -3,10 +3,10 @@ name: Build Bitcoin Paper Wallet
 env:
   ANDROID_HOME: /usr/local/lib/android/sdk
   ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+  PATH: $ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
 
-# 🔴 CHỈ CHO CHẠY THỦ CÔNG — KHÔNG TỰ ĐỘNG KÍCH HOẠT
 on:
-  workflow_dispatch:  # Chỉ hiện nút "Run workflow" trên trang Actions
+  workflow_dispatch:
 
 jobs:
   build:
@@ -23,11 +23,19 @@ jobs:
           distribution: 'zulu'
           cache: 'gradle'
 
-      - name: Cài Android SDK khớp dự án
+      - name: Cài Android Command Line Tools & SDK
         run: |
           chmod +x gradlew
+          # Tải cmdline-tools chuẩn mới nhất
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076798_latest.zip -O cmdline.zip
+          unzip -q cmdline.zip
+          mv cmdline-tools latest
+          rm cmdline.zip
+          # Cài các gói cần thiết khớp dự án
           yes | sdkmanager "platforms;android-37" "build-tools;37.0.0" "platform-tools"
-          sdkmanager --licenses
+          sdkmanager --licenses || true
 
       - name: Thực thi build
         run: ./gradlew clean assembleDebug --no-daemon --stacktrace
