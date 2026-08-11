@@ -5,13 +5,13 @@ plugins {
 android {
     namespace 'com.diamon.ganar'
     compileSdk {
-       version = release(37)
+       version = release(34)
     }
 
     defaultConfig {
         applicationId "com.diamon.ganar"
         minSdk 23
-        targetSdk 37
+        targetSdk 34
         versionCode 30
         versionName "2.0.3"
 
