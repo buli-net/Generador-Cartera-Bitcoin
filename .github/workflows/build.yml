@@ -13,8 +13,11 @@ jobs:
     name: Build APK Thủ Công
     runs-on: ubuntu-latest
     steps:
-      - name: Lấy mã nguồn
+      - name: Lấy mã nguồn — dùng GIT, không cần tar
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          archive: false
 
       - name: Cài JDK 11
         uses: actions/setup-java@v4
